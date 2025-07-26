@@ -1,4 +1,3 @@
-<?xml version="1.0" encoding="UTF-8"?>
 <svg xmlns="http://www.w3.org/2000/svg"
      viewBox="0 0 567.24 95.88"
      role="img" aria-label="SentinelOne logo">

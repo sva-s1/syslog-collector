@@ -1,14 +1,37 @@
+<div align="center">
+  <img src="https://upload.wikimedia.org/wikipedia/commons/3/33/SentinelOne_logo.svg" alt="SentinelOne Logo" width="300"/>
+  <br/><br/>
+  
+  <i>Logo sourced from Wikimedia Commons. SentinelOne and associated trademarks are owned by SentinelOne, Inc.</i>
+</div>
+
 # SentinelOne Syslog Collector
 
 [![Docker](https://img.shields.io/badge/Docker-2496ED?style=for-the-badge&logo=docker&logoColor=white)](https://www.docker.com/)
 [![SentinelOne](https://img.shields.io/badge/SentinelOne-663399?style=for-the-badge&logo=sentinelone&logoColor=white)](https://www.sentinelone.com/)
 [![License](https://img.shields.io/badge/License-MIT-yellow.svg?style=for-the-badge)](LICENSE)
-[![Syslog](https://img.shields.io/badge/Syslog-RFC5424-blue?style=for-the-badge)](https://tools.ietf.org/html/rfc5424)
+[![Syslog](https://img.shields.io/badge/Syslog-RFC3164%20%26%20RFC5424-blue?style=for-the-badge)](https://tools.ietf.org/html/rfc5424)
 
 A production-ready Docker-based syslog collector that receives syslog messages and forwards them to SentinelOne SIEM in real-time using the [addEvents API](https://community.sentinelone.com/s/article/000006773).
 
 > [!IMPORTANT]
 > This collector uses SentinelOne's addEvents API to ingest syslog data directly into your SIEM for real-time threat detection and analysis.
+
+## 🎯 Use Cases & When to Use This Project
+
+**Need to differentiate multiple syslog sources on the same incoming port?** That's this project! 🎉
+
+This is a fork of the [original SentinelOne Collector](https://community.sentinelone.com/s/article/000008665) designed to be easier, faster to deploy, and more scalable.
+
+### Choose Your Collector:
+
+- **Single syslog source or unique port per source?** → Use the [vanilla S1 Collector](https://community.sentinelone.com/s/topic/0TO69000000as2qGAA/sentinelone-collector) (no syslog-ng, straight Linux/Docker)
+- **Multiple sources on same port with log differentiation?** → **Use this project!** 🚀
+- **Want to test addEvents API before installing anything?** → Try the [addEvents testing project](https://github.com/sva-s1/addEvents)
+- **Need raw log samples for testing and security research?** → Check out the [Log Zoo](https://github.com/sva-s1/log-zoo)!
+
+> [!TIP]
+> ⭐ **STAR this repo** if you find it useful!
 
 ## 📋 Prerequisites
 
@@ -84,7 +107,7 @@ bash test-syslog.sh
 docker compose ps
 ```
 
-> [!SUCCESS]
+> [!TIP]
 > Your syslog collector is now running and forwarding messages to SentinelOne SIEM!
 
 ## 🧪 Testing & Validation

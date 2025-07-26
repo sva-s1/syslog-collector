@@ -1,5 +1,5 @@
 <div align="center">
-  <img src="https://upload.wikimedia.org/wikipedia/commons/3/33/SentinelOne_logo.svg" alt="SentinelOne Logo" width="300"/>
+  <img src="https://upload.wikimedia.org/wikipedia/commons/3/33/SentinelOne_logo.svg" alt="SentinelOne Logo" width="300" style="background: white; padding: 20px; border-radius: 10px; border: 1px solid #e1e4e8;"/>
   <br/><br/>
   
   <i>Logo sourced from Wikimedia Commons. SentinelOne and associated trademarks are owned by SentinelOne, Inc.</i>

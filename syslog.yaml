@@ -1,0 +1,19 @@
+api-token: ${API_TOKEN}
+destination: xdr.us1.sentinelone.net
+host: JQYDVVWVCJ
+ports:
+  - udp-514:
+      type: rfc5424
+  - tls-6514:
+      type: rfc3164
+source-types:
+  - cisco-router:
+     parser: ciscoRouter
+     matchers:
+     - attribute: hostname
+       matcher: router*
+  - cisco-firewall:
+     parser: ciscoFirewall
+     matchers:
+     - attribute: appname
+       matcher: firewall*

@@ -1,0 +1,32 @@
+# Environment variables with sensitive data
+.env
+
+# SSL/TLS certificates and keys
+syslog.crt
+syslog.key
+
+# Project-specific files
+message.txt
+generate-syslog.txt
+Dockerfile.nc-alpine
+
+# Configuration directories
+archive/
+cx_confs/
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Docker volumes and logs
+*.log
+
+# Temporary files
+*.tmp
+*.temp
+*~

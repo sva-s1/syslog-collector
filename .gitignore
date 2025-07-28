@@ -1,5 +1,6 @@
 # Environment variables with sensitive data
 .env
+.env.test
 
 # SSL/TLS certificates and keys
 syslog.crt

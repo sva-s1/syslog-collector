@@ -53,12 +53,12 @@ cd syslog-collector
 
 ### Step 2: Configure Environment
 
-Copy example configuration
+- Copy example configuration
 ```bash
 cp .env.example .env
 ```
 
-Edit configuration with your SentinelOne details using your preferred editor
+- Edit configuration with your SentinelOne details using your preferred editor
 ```bash
 vim .env 
 ```

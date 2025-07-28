@@ -52,15 +52,15 @@ cd syslog-collector
 ```
 
 ### Step 2: Configure Environment
+
+Copy example configuration
 ```bash
-# Copy example configuration
 cp .env.example .env
+```
 
-# Edit configuration with your SentinelOne details
-vim .env  # or nano .env
-
-# Secure the configuration file
-chmod 400 .env
+Edit configuration with your SentinelOne details using your preferred editor
+```bash
+vim .env 
 ```
 
 > [!NOTE]

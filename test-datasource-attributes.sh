@@ -1,24 +1,23 @@
-#!/bin/sh
+#!/bin/bash
 
-# Cleanup function to remove sensitive files
-cleanup() {
-    if [ -f "$SECURE_INPUT" ]; then
-        rm -f "$SECURE_INPUT"
-    fi
-    if [ -p "$FIFO_PATH" ]; then
-        rm -f "$FIFO_PATH"
-    fi
-}
+# Test script to verify dataSource attributes functionality
+# This simulates what happens inside the config-generator container
 
-# Set trap to cleanup on exit
-trap cleanup EXIT INT TERM
+set -e
 
-# Create a secure temporary file with restricted permissions
-SECURE_INPUT=$(mktemp -t syslog-config.XXXXXX)
-chmod 600 "$SECURE_INPUT"
+# Load test environment
+set -a  # automatically export all variables
+source .env.test
+set +a  # turn off automatic export
 
-# Generate syslog.yaml from template using environment variables
-# This replaces ALL variables in the template, not just API_TOKEN
+# Create a temporary file for testing
+TEMP_FILE=$(mktemp)
+trap "rm -f $TEMP_FILE" EXIT
+
+echo "Testing dataSource attributes functionality..."
+echo "============================================="
+
+# Perform the same substitution as the container script
 sed -e "s/\${AISIEM_LOGACCESS_WRITE_TOKEN}/$(printenv AISIEM_LOGACCESS_WRITE_TOKEN)/g" \
     -e "s/\${AISIEM_SERVER}/$(printenv AISIEM_SERVER)/g" \
     -e "s/\${SYSLOG_HOST}/$(printenv SYSLOG_HOST)/g" \
@@ -40,12 +39,23 @@ sed -e "s/\${AISIEM_LOGACCESS_WRITE_TOKEN}/$(printenv AISIEM_LOGACCESS_WRITE_TOK
     -e "s/\${SOURCE1_DATASOURCE_VENDOR}/$(printenv SOURCE1_DATASOURCE_VENDOR)/g" \
     -e "s/\${SOURCE2_DATASOURCE_NAME}/$(printenv SOURCE2_DATASOURCE_NAME)/g" \
     -e "s/\${SOURCE2_DATASOURCE_VENDOR}/$(printenv SOURCE2_DATASOURCE_VENDOR)/g" \
-    /etc/syslog-collector/syslog.yaml > "$SECURE_INPUT"
+    syslog.yaml > "$TEMP_FILE"
+
+echo "After initial substitution:"
+echo "=========================="
+cat "$TEMP_FILE"
+echo ""
 
 # Handle conditional dataSource attributes
 # Remove empty dataSource lines first
-sed '/dataSource\.name:[[:space:]]*$/d' "$SECURE_INPUT" > "$SECURE_INPUT.tmp1" && mv "$SECURE_INPUT.tmp1" "$SECURE_INPUT"
-sed '/dataSource\.vendor:[[:space:]]*$/d' "$SECURE_INPUT" > "$SECURE_INPUT.tmp2" && mv "$SECURE_INPUT.tmp2" "$SECURE_INPUT"
+echo "Removing empty dataSource lines..."
+sed '/dataSource\.name:[[:space:]]*$/d' "$TEMP_FILE" > "$TEMP_FILE.tmp1" && mv "$TEMP_FILE.tmp1" "$TEMP_FILE"
+sed '/dataSource\.vendor:[[:space:]]*$/d' "$TEMP_FILE" > "$TEMP_FILE.tmp2" && mv "$TEMP_FILE.tmp2" "$TEMP_FILE"
+
+echo "After removing empty lines:"
+echo "========================"
+cat "$TEMP_FILE"
+echo ""
 
 # Now check if we need to remove entire attributes sections
 for source_num in 1 2; do
@@ -54,8 +64,11 @@ for source_num in 1 2; do
     name_val=$(printenv "$name_var")
     vendor_val=$(printenv "$vendor_var")
     
+    echo "Source $source_num: name='$name_val', vendor='$vendor_val'"
+    
     # If both name and vendor are empty, remove the entire attributes section for this source
     if [[ -z "$name_val" && -z "$vendor_val" ]]; then
+        echo "  -> Removing entire attributes section for source $source_num"
         # Use a simpler approach: create a temp file without the attributes section
         awk -v source="SOURCE${source_num}_NAME" '
         BEGIN { in_source = 0; in_attributes = 0; skip_until_matchers = 0 }
@@ -81,35 +94,13 @@ for source_num in 1 2; do
         }
         skip_until_matchers { next }
         { print $0 }
-        ' "$SECURE_INPUT" > "$SECURE_INPUT.tmp" && mv "$SECURE_INPUT.tmp" "$SECURE_INPUT"
+        ' "$TEMP_FILE" > "$TEMP_FILE.tmp" && mv "$TEMP_FILE.tmp" "$TEMP_FILE"
+    else
+        echo "  -> Keeping attributes section (has non-empty values)"
     fi
 done
 
-# Set INPUT to point to the secure substituted file
-export INPUT="$SECURE_INPUT"
-
-# Check for required files
-abort=0
-for f in /etc/syslog-collector/syslog.yaml /etc/syslog-collector/syslog.crt /etc/syslog-collector/syslog.key; do
-  test -e "$f" || { echo "$(basename "$f") not found"; abort=1; }
-done
-if [ $abort -eq 1 ]; then
-    cleanup
-    exit 1
-fi
-
-# Create cert directory and copy certificates
-mkdir -p /out/etc/syslog-ng/cert.d
-(cd /etc/syslog-collector && cp -f syslog.crt syslog.key /out/etc/syslog-ng/cert.d)
-
-# Run the config-generator with all required parameters
-# Note: cleanup will be called automatically via trap when config-generator exits
-exec config-generator \
-  -i "$INPUT" \
-  -o "$AGENT_OUTPUT" \
-  -s "$SYSLOG_OUTPUT" \
-  -lc "$LOGROTATE_CONFIG_OUTPUT" \
-  -ls "$LOGROTATE_SCRIPT_OUTPUT" \
-  -l "$LOGPATH" \
-  -d "$SYSLOG_IMAGE" \
-  -e "$VERSION"
+echo ""
+echo "Final result after conditional processing:"
+echo "========================================="
+cat "$TEMP_FILE"

@@ -72,6 +72,20 @@ AISIEM_SERVER=xdr.us1.sentinelone.net            # Your S1 server
 SYSLOG_HOST=your-host-identifier                 # Unique identifier
 ```
 
+**Optional dataSource attributes (leave blank to skip):**
+```bash
+# Source Type 1 - Router logs
+SOURCE1_DATASOURCE_NAME=Cisco Router
+SOURCE1_DATASOURCE_VENDOR=Cisco
+
+# Source Type 2 - Firewall logs  
+SOURCE2_DATASOURCE_NAME=Cisco Firepower Threat Defense
+SOURCE2_DATASOURCE_VENDOR=Cisco
+```
+
+> [!TIP]
+> **DataSource attributes** help categorize your logs in SentinelOne SIEM. If you leave `SOURCE*_DATASOURCE_NAME` or `SOURCE*_DATASOURCE_VENDOR` blank, those attributes will be automatically omitted from the configuration.
+
 ### Step 3: Generate SSL Certificates
 
 > [!TIP]

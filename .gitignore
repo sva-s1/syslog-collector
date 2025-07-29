@@ -20,9 +20,6 @@ Dockerfile.nc-alpine
 ehthumbs.db
 Thumbs.db
 
-# Docker volumes and logs
-*.log
-
 # Temporary files
 *.tmp
 *.temp

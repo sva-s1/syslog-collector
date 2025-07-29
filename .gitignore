@@ -11,10 +11,6 @@ message.txt
 generate-syslog.txt
 Dockerfile.nc-alpine
 
-# Configuration directories
-archive/
-cx_confs/
-
 # OS generated files
 .DS_Store
 .DS_Store?

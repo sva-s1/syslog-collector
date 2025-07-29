@@ -15,7 +15,7 @@ services:
         target: /etc/syslog-collector
         read_only: true
       - type: bind
-        source: ./substitute-and-run.sh
+        source: ./scripts/substitute-and-run.sh
         target: /substitute-and-run.sh
         read_only: true
       - type: volume
@@ -31,7 +31,7 @@ services:
         source: logrotate-script
         target: /out/usr/local/sbin
     environment:
-      INPUT: /etc/syslog-collector/syslog.yaml
+      INPUT: /etc/syslog-collector/config/syslog.yaml
       AGENT_OUTPUT: /out/etc/scalyr-agent-2/agent.json
       SYSLOG_OUTPUT: /out/etc/syslog-ng/syslog-ng.conf
       LOGPATH: &syslog-ng-log-path /var/log/syslog-collector

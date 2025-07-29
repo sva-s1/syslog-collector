@@ -19,7 +19,7 @@ chmod 600 "$SECURE_INPUT"
 
 # Generate syslog.yaml from template using environment variables
 # Use a safer approach that handles special characters properly
-cp /etc/syslog-collector/syslog.yaml "$SECURE_INPUT"
+cp /etc/syslog-collector/config/syslog.yaml "$SECURE_INPUT"
 
 # Function to safely replace variables using printf for proper escaping
 safe_replace() {
@@ -116,7 +116,7 @@ export INPUT="$SECURE_INPUT"
 
 # Check for required files
 abort=0
-for f in /etc/syslog-collector/syslog.yaml /etc/syslog-collector/syslog.crt /etc/syslog-collector/syslog.key; do
+for f in /etc/syslog-collector/config/syslog.yaml /etc/syslog-collector/syslog.crt /etc/syslog-collector/syslog.key; do
   test -e "$f" || { echo "$(basename "$f") not found"; abort=1; }
 done
 if [ $abort -eq 1 ]; then
@@ -153,9 +153,9 @@ for i in $(seq 1 30); do
 done
 
 # Set up continuous post-processing monitoring
-if [ -f "/etc/syslog-collector/post-process-agent.sh" ]; then
+if [ -f "/etc/syslog-collector/scripts/post-process-agent.sh" ]; then
     echo "DEBUG: Setting up continuous post-processing monitoring..."
-    cp "/etc/syslog-collector/post-process-agent.sh" "/tmp/post-process-agent.sh"
+    cp "/etc/syslog-collector/scripts/post-process-agent.sh" "/tmp/post-process-agent.sh"
     chmod +x "/tmp/post-process-agent.sh"
     
     # Start monitoring loop in background

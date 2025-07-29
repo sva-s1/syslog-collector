@@ -10,7 +10,7 @@ source-types:
   - ${SOURCE1_NAME}:
      parser: ${SOURCE1_PARSER}
      attributes:
-       dataSource.category: security
+       dataSource.category: ${SOURCE1_DATASOURCE_CATEGORY}
        dataSource.name: ${SOURCE1_DATASOURCE_NAME}
        dataSource.vendor: ${SOURCE1_DATASOURCE_VENDOR}
      matchers:
@@ -19,7 +19,7 @@ source-types:
   - ${SOURCE2_NAME}:
      parser: ${SOURCE2_PARSER}
      attributes:
-       dataSource.category: security
+       dataSource.category: ${SOURCE2_DATASOURCE_CATEGORY}
        dataSource.name: ${SOURCE2_DATASOURCE_NAME}
        dataSource.vendor: ${SOURCE2_DATASOURCE_VENDOR}
      matchers:

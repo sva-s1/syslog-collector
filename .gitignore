@@ -6,6 +6,10 @@
 syslog.crt
 syslog.key
 
+# Docker volumes and logs (exclude runtime logs but allow sample logs)
+*.log
+!samples/*.log
+
 # Project-specific files
 message.txt
 generate-syslog.txt

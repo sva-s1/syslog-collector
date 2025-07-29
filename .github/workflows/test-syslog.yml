@@ -101,6 +101,22 @@ jobs:
         API_TOKEN=\${AISIEM_LOGACCESS_WRITE_TOKEN}
         EOF
         
+    - name: Generate SSL certificates
+      run: |
+        echo "🔐 Generating SSL certificates for TLS syslog..."
+        
+        # Create certificate directory
+        mkdir -p cert.d
+        
+        # Generate self-signed certificate for testing
+        openssl req -x509 -newkey rsa:2048 -keyout cert.d/syslog.key -out cert.d/syslog.crt -days 1 -nodes -subj "/C=US/ST=Test/L=Test/O=Test/CN=localhost"
+        
+        # Verify certificates were created
+        test -f cert.d/syslog.crt || { echo "❌ Failed to generate syslog.crt"; exit 1; }
+        test -f cert.d/syslog.key || { echo "❌ Failed to generate syslog.key"; exit 1; }
+        
+        echo "✅ SSL certificates generated successfully"
+        
     - name: Validate configuration files
       run: |
         echo "🔍 Validating configuration files..."

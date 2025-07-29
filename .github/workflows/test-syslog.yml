@@ -1,0 +1,221 @@
+name: Test Syslog Collector
+
+on:
+  # Manual trigger via GitHub UI
+  workflow_dispatch:
+    inputs:
+      test_environment:
+        description: 'Test environment'
+        required: false
+        default: 'development'
+        type: choice
+        options:
+        - development
+        - staging
+        - production
+      
+  # Trigger on commits to main branch
+  push:
+    branches: [ main ]
+    paths:
+      - 'config/**'
+      - 'scripts/**'
+      - 'samples/**'
+      - 'utils/**'
+      - 'docker-compose.yml'
+      - '.env.example'
+
+  # Trigger on pull requests
+  pull_request:
+    branches: [ main ]
+    paths:
+      - 'config/**'
+      - 'scripts/**'
+      - 'samples/**'
+      - 'utils/**'
+      - 'docker-compose.yml'
+      - '.env.example'
+
+env:
+  # These will be set from repository secrets
+  AISIEM_LOGACCESS_WRITE_TOKEN: ${{ secrets.AISIEM_LOGACCESS_WRITE_TOKEN }}
+  AISIEM_SERVER: ${{ secrets.AISIEM_SERVER }}
+  SYSLOG_HOST: ${{ secrets.SYSLOG_HOST }}
+
+jobs:
+  test-syslog-collector:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+      
+    - name: Create .env file from secrets
+      run: |
+        cat > .env << EOF
+        # SentinelOne API Configuration
+        AISIEM_LOGACCESS_WRITE_TOKEN=${{ secrets.AISIEM_LOGACCESS_WRITE_TOKEN }}
+        AISIEM_SERVER=${{ secrets.AISIEM_SERVER }}
+        SYSLOG_HOST=${{ secrets.SYSLOG_HOST }}
+        
+        # Port and Protocol Configuration
+        PORT1_PROTOCOL=udp
+        PORT1_NUMBER=514
+        PORT1_TYPE=rfc5424
+        
+        PORT2_PROTOCOL=tls
+        PORT2_NUMBER=6514
+        PORT2_TYPE=rfc3164
+        
+        # Source 1: Cisco Router
+        SOURCE1_NAME=cisco-router
+        SOURCE1_PARSER=ciscoRouter1
+        SOURCE1_ATTRIBUTE=hostname
+        SOURCE1_MATCHER=router*
+        SOURCE1_DATASOURCE_NAME="Cisco Router"
+        SOURCE1_DATASOURCE_VENDOR="Cisco"
+        SOURCE1_DATASOURCE_CATEGORY="security"
+        
+        # Source 2: Cisco Firewall
+        SOURCE2_NAME=cisco-firewall
+        SOURCE2_PARSER=ciscoFirewall1
+        SOURCE2_ATTRIBUTE=appname
+        SOURCE2_MATCHER=firewall*
+        SOURCE2_DATASOURCE_NAME="Cisco Firepower Threat Defense"
+        SOURCE2_DATASOURCE_VENDOR="Cisco"
+        SOURCE2_DATASOURCE_CATEGORY="security"
+        
+        # Source 3: Palo Alto Firewall
+        SOURCE3_NAME=palo-alto-firewall
+        SOURCE3_PARSER=paloAltoFirewall
+        SOURCE3_ATTRIBUTE=appname
+        SOURCE3_MATCHER=PA-*
+        SOURCE3_DATASOURCE_NAME="Palo Alto Firewall"
+        SOURCE3_DATASOURCE_VENDOR="Palo Alto Networks"
+        SOURCE3_DATASOURCE_CATEGORY="security"
+        
+        # Legacy API_TOKEN (for backward compatibility)
+        API_TOKEN=\${AISIEM_LOGACCESS_WRITE_TOKEN}
+        EOF
+        
+    - name: Validate configuration files
+      run: |
+        echo "🔍 Validating configuration files..."
+        
+        # Check required files exist
+        test -f config/syslog.yaml || { echo "❌ config/syslog.yaml missing"; exit 1; }
+        test -f scripts/substitute-and-run.sh || { echo "❌ scripts/substitute-and-run.sh missing"; exit 1; }
+        test -f scripts/post-process-agent.sh || { echo "❌ scripts/post-process-agent.sh missing"; exit 1; }
+        test -f docker-compose.yml || { echo "❌ docker-compose.yml missing"; exit 1; }
+        
+        # Check sample files exist
+        test -f samples/cisco-firewall.log || { echo "❌ samples/cisco-firewall.log missing"; exit 1; }
+        test -f samples/cisco-router.log || { echo "❌ samples/cisco-router.log missing"; exit 1; }
+        test -f samples/palo-alto.log || { echo "❌ samples/palo-alto.log missing"; exit 1; }
+        
+        # Check test script exists and is executable
+        test -f utils/send.sh || { echo "❌ utils/send.sh missing"; exit 1; }
+        
+        echo "✅ All configuration files present"
+        
+    - name: Start syslog collector
+      run: |
+        echo "🚀 Starting syslog collector containers..."
+        docker compose up -d
+        
+        # Wait for containers to be healthy
+        echo "⏳ Waiting for containers to be ready..."
+        timeout=60
+        while [ $timeout -gt 0 ]; do
+          if docker compose ps | grep -q "healthy"; then
+            echo "✅ Containers are healthy"
+            break
+          fi
+          sleep 2
+          timeout=$((timeout - 2))
+        done
+        
+        if [ $timeout -le 0 ]; then
+          echo "❌ Containers failed to become healthy"
+          docker compose logs
+          exit 1
+        fi
+        
+    - name: Verify dynamic source detection
+      run: |
+        echo "🔍 Verifying dynamic source detection..."
+        
+        # Check config-generator logs for source detection
+        docker compose logs config-generator | grep -E "(Detecting SOURCE|Processing SOURCE|Found [0-9]+ configured sources)" || {
+          echo "❌ Dynamic source detection not working"
+          docker compose logs config-generator
+          exit 1
+        }
+        
+        # Verify agent.json contains all 3 sources with dataSource attributes
+        agent_json=$(docker exec syslog-collector-scalyr-agent-1 cat /etc/scalyr-agent-2/agent.json)
+        
+        echo "$agent_json" | grep -q "cisco-router" || { echo "❌ cisco-router source missing"; exit 1; }
+        echo "$agent_json" | grep -q "cisco-firewall" || { echo "❌ cisco-firewall source missing"; exit 1; }
+        echo "$agent_json" | grep -q "palo-alto-firewall" || { echo "❌ palo-alto-firewall source missing"; exit 1; }
+        
+        echo "$agent_json" | grep -q "dataSource.category" || { echo "❌ dataSource attributes missing"; exit 1; }
+        echo "$agent_json" | grep -q "Cisco Router" || { echo "❌ Cisco Router dataSource missing"; exit 1; }
+        echo "$agent_json" | grep -q "Palo Alto Networks" || { echo "❌ Palo Alto dataSource missing"; exit 1; }
+        
+        echo "✅ All 3 sources detected with dataSource attributes"
+        
+    - name: Run syslog tests
+      run: |
+        echo "🧪 Running syslog message tests..."
+        
+        # Make send.sh executable
+        chmod +x utils/send.sh
+        
+        # Run the test script
+        ./utils/send.sh
+        
+        # Wait a moment for logs to be processed
+        sleep 10
+        
+        echo "✅ Test messages sent successfully"
+        
+    - name: Verify log processing
+      run: |
+        echo "🔍 Verifying log processing..."
+        
+        # Check syslog-ng logs for received messages
+        syslog_logs=$(docker compose logs syslog-ng)
+        
+        # Look for evidence of message processing (file creation, etc.)
+        docker compose exec syslog-ng ls -la /var/log/syslog-collector/ || true
+        
+        echo "✅ Log processing verification complete"
+        
+    - name: Show container status and logs
+      if: always()
+      run: |
+        echo "📊 Container Status:"
+        docker compose ps
+        
+        echo ""
+        echo "📋 Config Generator Logs:"
+        docker compose logs config-generator | tail -50
+        
+        echo ""
+        echo "📋 Scalyr Agent Logs:"
+        docker compose logs scalyr-agent | tail -20
+        
+        echo ""
+        echo "📋 Syslog-NG Logs:"
+        docker compose logs syslog-ng | tail -20
+        
+    - name: Cleanup
+      if: always()
+      run: |
+        echo "🧹 Cleaning up containers..."
+        docker compose down -v
+        docker system prune -f

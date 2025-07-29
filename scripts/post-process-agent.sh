@@ -16,13 +16,8 @@ echo "Post-processing $AGENT_JSON to add dataSource attributes..."
 TEMP_AGENT_JSON=$(mktemp)
 trap "rm -f $TEMP_AGENT_JSON" EXIT
 
-# Get dataSource values from environment
-SOURCE1_NAME="${SOURCE1_DATASOURCE_NAME:-}"
-SOURCE1_VENDOR="${SOURCE1_DATASOURCE_VENDOR:-}"
-SOURCE1_CATEGORY="${SOURCE1_DATASOURCE_CATEGORY:-}"
-SOURCE2_NAME="${SOURCE2_DATASOURCE_NAME:-}"
-SOURCE2_VENDOR="${SOURCE2_DATASOURCE_VENDOR:-}"
-SOURCE2_CATEGORY="${SOURCE2_DATASOURCE_CATEGORY:-}"
+# Get all SOURCE* dataSource values from environment (dynamic detection)
+echo "DEBUG: Detecting SOURCE* dataSource environment variables..."
 
 # Use Python to process the JSON (more reliable than jq in containers)
 python3 << EOF
@@ -38,36 +33,59 @@ except Exception as e:
     print(f"Error reading agent.json: {e}")
     sys.exit(1)
 
-# Get environment variables
-source1_name = os.environ.get('SOURCE1_DATASOURCE_NAME', '').strip()
-source1_vendor = os.environ.get('SOURCE1_DATASOURCE_VENDOR', '').strip()
-source1_category = os.environ.get('SOURCE1_DATASOURCE_CATEGORY', '').strip()
-source2_name = os.environ.get('SOURCE2_DATASOURCE_NAME', '').strip()
-source2_vendor = os.environ.get('SOURCE2_DATASOURCE_VENDOR', '').strip()
-source2_category = os.environ.get('SOURCE2_DATASOURCE_CATEGORY', '').strip()
+# Dynamically get all SOURCE* dataSource environment variables
+source_configs = {}
+for key, value in os.environ.items():
+    # Only process SOURCE*_NAME variables (not DATASOURCE_NAME)
+    if key.startswith('SOURCE') and key.endswith('_NAME') and '_DATASOURCE_' not in key:
+        # Extract source number from SOURCE{N}_NAME
+        source_num = key.split('_')[0].replace('SOURCE', '')
+        if source_num not in source_configs:
+            source_configs[source_num] = {}
+        
+        # Get the source name to determine source type (this is the SOURCE*_NAME value)
+        source_name = value.strip()
+        source_configs[source_num]['source_type'] = source_name
+        
+        # Get corresponding dataSource attributes
+        ds_name = os.environ.get(f'SOURCE{source_num}_DATASOURCE_NAME', '').strip()
+        ds_vendor = os.environ.get(f'SOURCE{source_num}_DATASOURCE_VENDOR', '').strip()
+        ds_category = os.environ.get(f'SOURCE{source_num}_DATASOURCE_CATEGORY', '').strip()
+        
+        if ds_name or ds_vendor or ds_category:
+            source_configs[source_num]['dataSource'] = {
+                'name': ds_name,
+                'vendor': ds_vendor,
+                'category': ds_category
+            }
+            print(f"Found dataSource config for SOURCE{source_num}: {source_name} -> {ds_name}")
 
 # Process each log entry
 if 'logs' in agent_config:
     for log_entry in agent_config['logs']:
         if 'attributes' in log_entry:
             source_type = log_entry['attributes'].get('source_type', '')
+            print(f"Processing log entry with source_type: '{source_type}'")
             
-            # Add dataSource attributes based on source type
-            if source_type == 'cisco-router' and (source1_name or source1_vendor or source1_category):
-                if source1_category:
-                    log_entry['attributes']['dataSource.category'] = source1_category
-                if source1_name:
-                    log_entry['attributes']['dataSource.name'] = source1_name
-                if source1_vendor:
-                    log_entry['attributes']['dataSource.vendor'] = source1_vendor
+            # Find matching source configuration by source_type
+            matched = False
+            for source_num, config in source_configs.items():
+                print(f"  Checking SOURCE{source_num} with source_type: '{config.get('source_type', '')}'")
+                if 'dataSource' in config and config['source_type'] == source_type:
+                    ds_attrs = config['dataSource']
+                    print(f"  MATCH! Adding dataSource attributes to {source_type}")
                     
-            elif source_type == 'cisco-firewall' and (source2_name or source2_vendor or source2_category):
-                if source2_category:
-                    log_entry['attributes']['dataSource.category'] = source2_category
-                if source2_name:
-                    log_entry['attributes']['dataSource.name'] = source2_name
-                if source2_vendor:
-                    log_entry['attributes']['dataSource.vendor'] = source2_vendor
+                    if ds_attrs['category']:
+                        log_entry['attributes']['dataSource.category'] = ds_attrs['category']
+                    if ds_attrs['name']:
+                        log_entry['attributes']['dataSource.name'] = ds_attrs['name']
+                    if ds_attrs['vendor']:
+                        log_entry['attributes']['dataSource.vendor'] = ds_attrs['vendor']
+                    matched = True
+                    break
+            
+            if not matched:
+                print(f"  No match found for source_type: '{source_type}'")
 
 # Write the updated configuration
 try:

@@ -7,21 +7,4 @@ ports:
   - ${PORT2_PROTOCOL}-${PORT2_NUMBER}:
       type: ${PORT2_TYPE}
 source-types:
-  - ${SOURCE1_NAME}:
-     parser: ${SOURCE1_PARSER}
-     attributes:
-       dataSource.category: ${SOURCE1_DATASOURCE_CATEGORY}
-       dataSource.name: ${SOURCE1_DATASOURCE_NAME}
-       dataSource.vendor: ${SOURCE1_DATASOURCE_VENDOR}
-     matchers:
-     - attribute: ${SOURCE1_ATTRIBUTE}
-       matcher: ${SOURCE1_MATCHER}
-  - ${SOURCE2_NAME}:
-     parser: ${SOURCE2_PARSER}
-     attributes:
-       dataSource.category: ${SOURCE2_DATASOURCE_CATEGORY}
-       dataSource.name: ${SOURCE2_DATASOURCE_NAME}
-       dataSource.vendor: ${SOURCE2_DATASOURCE_VENDOR}
-     matchers:
-     - attribute: ${SOURCE2_ATTRIBUTE}
-       matcher: ${SOURCE2_MATCHER}
+# DYNAMIC_SOURCES_PLACEHOLDER - This will be replaced by substitute-and-run.sh with all detected SOURCE* configurations

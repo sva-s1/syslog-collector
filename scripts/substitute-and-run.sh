@@ -32,7 +32,7 @@ safe_replace() {
     mv "$temp_file" "$SECURE_INPUT"
 }
 
-# Replace all variables safely
+# Replace basic configuration variables
 safe_replace "AISIEM_LOGACCESS_WRITE_TOKEN" "$(printenv AISIEM_LOGACCESS_WRITE_TOKEN)"
 safe_replace "AISIEM_SERVER" "$(printenv AISIEM_SERVER)"
 safe_replace "SYSLOG_HOST" "$(printenv SYSLOG_HOST)"
@@ -42,74 +42,103 @@ safe_replace "PORT1_TYPE" "$(printenv PORT1_TYPE)"
 safe_replace "PORT2_PROTOCOL" "$(printenv PORT2_PROTOCOL)"
 safe_replace "PORT2_NUMBER" "$(printenv PORT2_NUMBER)"
 safe_replace "PORT2_TYPE" "$(printenv PORT2_TYPE)"
-safe_replace "SOURCE1_NAME" "$(printenv SOURCE1_NAME)"
-safe_replace "SOURCE1_PARSER" "$(printenv SOURCE1_PARSER)"
-safe_replace "SOURCE1_ATTRIBUTE" "$(printenv SOURCE1_ATTRIBUTE)"
-safe_replace "SOURCE1_MATCHER" "$(printenv SOURCE1_MATCHER)"
-safe_replace "SOURCE2_NAME" "$(printenv SOURCE2_NAME)"
-safe_replace "SOURCE2_PARSER" "$(printenv SOURCE2_PARSER)"
-safe_replace "SOURCE2_ATTRIBUTE" "$(printenv SOURCE2_ATTRIBUTE)"
-safe_replace "SOURCE2_MATCHER" "$(printenv SOURCE2_MATCHER)"
-safe_replace "SOURCE1_DATASOURCE_NAME" "$(printenv SOURCE1_DATASOURCE_NAME)"
-safe_replace "SOURCE1_DATASOURCE_VENDOR" "$(printenv SOURCE1_DATASOURCE_VENDOR)"
-safe_replace "SOURCE1_DATASOURCE_CATEGORY" "$(printenv SOURCE1_DATASOURCE_CATEGORY)"
-safe_replace "SOURCE2_DATASOURCE_NAME" "$(printenv SOURCE2_DATASOURCE_NAME)"
-safe_replace "SOURCE2_DATASOURCE_VENDOR" "$(printenv SOURCE2_DATASOURCE_VENDOR)"
-safe_replace "SOURCE2_DATASOURCE_CATEGORY" "$(printenv SOURCE2_DATASOURCE_CATEGORY)"
 
-# Debug: Check what dataSource environment variables contain
-echo "DEBUG: SOURCE1_DATASOURCE_NAME='$(printenv SOURCE1_DATASOURCE_NAME)'"
-echo "DEBUG: SOURCE1_DATASOURCE_VENDOR='$(printenv SOURCE1_DATASOURCE_VENDOR)'"
-echo "DEBUG: SOURCE1_DATASOURCE_CATEGORY='$(printenv SOURCE1_DATASOURCE_CATEGORY)'"
-echo "DEBUG: SOURCE2_DATASOURCE_NAME='$(printenv SOURCE2_DATASOURCE_NAME)'"
-echo "DEBUG: SOURCE2_DATASOURCE_VENDOR='$(printenv SOURCE2_DATASOURCE_VENDOR)'"
-echo "DEBUG: SOURCE2_DATASOURCE_CATEGORY='$(printenv SOURCE2_DATASOURCE_CATEGORY)'"
+# Dynamically generate source-types configuration
+echo "DEBUG: Detecting SOURCE* environment variables..."
+SOURCE_CONFIG=""
+SOURCE_COUNT=0
 
-# Handle conditional dataSource attributes
-# TEMPORARILY DISABLED: Remove empty dataSource lines first (only lines with no value after colon)
-# sed '/dataSource\.name:[[:space:]]*$/d' "$SECURE_INPUT" > "$SECURE_INPUT.tmp1" && mv "$SECURE_INPUT.tmp1" "$SECURE_INPUT"
-# sed '/dataSource\.vendor:[[:space:]]*$/d' "$SECURE_INPUT" > "$SECURE_INPUT.tmp2" && mv "$SECURE_INPUT.tmp2" "$SECURE_INPUT"
-# sed '/dataSource\.category:[[:space:]]*$/d' "$SECURE_INPUT" > "$SECURE_INPUT.tmp3" && mv "$SECURE_INPUT.tmp3" "$SECURE_INPUT"
-
-# Now check if we need to remove entire attributes sections
-for source_num in 1 2; do
-    name_var="SOURCE${source_num}_DATASOURCE_NAME"
-    vendor_var="SOURCE${source_num}_DATASOURCE_VENDOR"
-    category_var="SOURCE${source_num}_DATASOURCE_CATEGORY"
-    name_val=$(printenv "$name_var")
-    vendor_val=$(printenv "$vendor_var")
-    category_val=$(printenv "$category_var")
+# Find all SOURCE*_NAME variables to determine configured sources
+for var in $(printenv | grep '^SOURCE[0-9]*_NAME=' | sort -V); do
+    source_num=$(echo "$var" | sed 's/SOURCE\([0-9]*\)_NAME=.*/\1/')
+    source_name=$(echo "$var" | sed 's/SOURCE[0-9]*_NAME=//')
     
-    # If all dataSource attributes are empty, remove the entire attributes section for this source
-    if [ -z "$name_val" ] && [ -z "$vendor_val" ] && [ -z "$category_val" ]; then
-        # Use a simpler approach: create a temp file without the attributes section
-        awk -v source="SOURCE${source_num}_NAME" '
-        BEGIN { in_source = 0; in_attributes = 0; skip_until_matchers = 0 }
-        /^[[:space:]]*-[[:space:]]*\$\{/ {
-            if ($0 ~ "\\$\\{" source "\\}:") {
-                in_source = 1
-                print $0
-                next
-            } else {
-                in_source = 0
-            }
-        }
-        in_source && /^[[:space:]]*attributes:[[:space:]]*$/ {
-            in_attributes = 1
-            skip_until_matchers = 1
-            next
-        }
-        in_source && skip_until_matchers && /^[[:space:]]*matchers:[[:space:]]*$/ {
-            skip_until_matchers = 0
-            in_attributes = 0
-            print $0
-            next
-        }
-        skip_until_matchers { next }
-        { print $0 }
-        ' "$SECURE_INPUT" > "$SECURE_INPUT.tmp" && mv "$SECURE_INPUT.tmp" "$SECURE_INPUT"
+    # Skip if source name is empty
+    if [ -z "$source_name" ]; then
+        continue
     fi
+    
+    # Get all required variables for this source
+    parser_var="SOURCE${source_num}_PARSER"
+    attribute_var="SOURCE${source_num}_ATTRIBUTE"
+    matcher_var="SOURCE${source_num}_MATCHER"
+    
+    parser_val=$(printenv "$parser_var")
+    attribute_val=$(printenv "$attribute_var")
+    matcher_val=$(printenv "$matcher_var")
+    
+    # Skip if any required variable is missing
+    if [ -z "$parser_val" ] || [ -z "$attribute_val" ] || [ -z "$matcher_val" ]; then
+        echo "DEBUG: Skipping SOURCE${source_num} - missing required variables"
+        continue
+    fi
+    
+    echo "DEBUG: Processing SOURCE${source_num}: $source_name"
+    
+    # Get optional dataSource variables
+    ds_name_var="SOURCE${source_num}_DATASOURCE_NAME"
+    ds_vendor_var="SOURCE${source_num}_DATASOURCE_VENDOR"
+    ds_category_var="SOURCE${source_num}_DATASOURCE_CATEGORY"
+    
+    ds_name_val=$(printenv "$ds_name_var")
+    ds_vendor_val=$(printenv "$ds_vendor_var")
+    ds_category_val=$(printenv "$ds_category_var")
+    
+    # Build source configuration
+    SOURCE_CONFIG="${SOURCE_CONFIG}  - ${source_name}:\n"
+    SOURCE_CONFIG="${SOURCE_CONFIG}     parser: ${parser_val}\n"
+    
+    # Add attributes section if any dataSource attributes are defined
+    if [ -n "$ds_name_val" ] || [ -n "$ds_vendor_val" ] || [ -n "$ds_category_val" ]; then
+        SOURCE_CONFIG="${SOURCE_CONFIG}     attributes:\n"
+        [ -n "$ds_category_val" ] && SOURCE_CONFIG="${SOURCE_CONFIG}       dataSource.category: ${ds_category_val}\n"
+        [ -n "$ds_name_val" ] && SOURCE_CONFIG="${SOURCE_CONFIG}       dataSource.name: ${ds_name_val}\n"
+        [ -n "$ds_vendor_val" ] && SOURCE_CONFIG="${SOURCE_CONFIG}       dataSource.vendor: ${ds_vendor_val}\n"
+    fi
+    
+    # Add matchers section
+    SOURCE_CONFIG="${SOURCE_CONFIG}     matchers:\n"
+    SOURCE_CONFIG="${SOURCE_CONFIG}     - attribute: ${attribute_val}\n"
+    SOURCE_CONFIG="${SOURCE_CONFIG}       matcher: ${matcher_val}\n"
+    
+    SOURCE_COUNT=$((SOURCE_COUNT + 1))
+    
+    # Debug output
+    echo "DEBUG: SOURCE${source_num}_DATASOURCE_NAME='$ds_name_val'"
+    echo "DEBUG: SOURCE${source_num}_DATASOURCE_VENDOR='$ds_vendor_val'"
+    echo "DEBUG: SOURCE${source_num}_DATASOURCE_CATEGORY='$ds_category_val'"
 done
+
+echo "DEBUG: Found $SOURCE_COUNT configured sources"
+
+# Replace the placeholder with generated source configuration
+if [ $SOURCE_COUNT -gt 0 ]; then
+    # Create a temporary file with the source configuration
+    TEMP_SOURCES=$(mktemp)
+    printf "%s" "$SOURCE_CONFIG" | sed 's/\\n/\n/g' > "$TEMP_SOURCES"
+    
+    # Use awk to replace the placeholder with the file contents
+    awk '
+    /# DYNAMIC_SOURCES_PLACEHOLDER/ {
+        while ((getline line < "'"$TEMP_SOURCES"'") > 0) {
+            print line
+        }
+        close("'"$TEMP_SOURCES"'")
+        next
+    }
+    { print }
+    ' "$SECURE_INPUT" > "$SECURE_INPUT.tmp" && mv "$SECURE_INPUT.tmp" "$SECURE_INPUT"
+    
+    rm -f "$TEMP_SOURCES"
+else
+    echo "WARNING: No valid SOURCE configurations found!"
+    # Remove the placeholder line
+    sed '/# DYNAMIC_SOURCES_PLACEHOLDER.*/d' "$SECURE_INPUT" > "$SECURE_INPUT.tmp" && mv "$SECURE_INPUT.tmp" "$SECURE_INPUT"
+fi
+
+# Dynamic source configuration complete
+
+# Dynamic source generation handles attributes properly - no cleanup needed
 
 # Set INPUT to point to the secure substituted file
 export INPUT="$SECURE_INPUT"

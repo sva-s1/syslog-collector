@@ -53,6 +53,16 @@ jobs:
     - name: Set up Docker Buildx
       uses: docker/setup-buildx-action@v3
       
+    - name: Build netcat image for GitHub Actions
+      run: |
+        echo "🔨 Building alpine-nc image for AMD64 (GitHub Actions)..."
+        docker buildx build --platform linux/amd64 \
+          -t ghcr.io/sva-s1/alpine-nc:latest \
+          -f Dockerfile.nc-alpine \
+          --load .
+        
+        echo "✅ Alpine-nc image built successfully for GitHub Actions"
+      
     - name: Create .env file from secrets
       run: |
         cat > .env << EOF

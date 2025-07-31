@@ -140,7 +140,27 @@ jobs:
     - name: Start syslog collector
       run: |
         echo "🚀 Starting syslog collector containers..."
+        
+        # Check SSL certificates exist before starting
+        echo "🔍 Checking SSL certificates..."
+        ls -la cert.d/ || echo "⚠️ cert.d directory not found"
+        
+        # Start containers
         docker compose up -d
+        
+        # Give containers a moment to start
+        sleep 5
+        
+        # Check container status immediately
+        echo "📊 Container status after startup:"
+        docker compose ps
+        
+        # Check for any failed containers
+        if docker compose ps | grep -q "Exit"; then
+          echo "❌ Some containers failed to start. Showing logs:"
+          docker compose logs
+          exit 1
+        fi
         
         # Wait for containers to be healthy
         echo "⏳ Waiting for containers to be ready..."
@@ -155,7 +175,10 @@ jobs:
         done
         
         if [ $timeout -le 0 ]; then
-          echo "❌ Containers failed to become healthy"
+          echo "❌ Containers failed to become healthy within timeout"
+          echo "📊 Final container status:"
+          docker compose ps
+          echo "📋 Container logs:"
           docker compose logs
           exit 1
         fi

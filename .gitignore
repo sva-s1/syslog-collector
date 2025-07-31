@@ -11,11 +11,6 @@ cert.d/
 *.log
 !samples/*.log
 
-# Project-specific files
-message.txt
-generate-syslog.txt
-Dockerfile.nc-alpine
-
 # OS generated files
 .DS_Store
 .DS_Store?

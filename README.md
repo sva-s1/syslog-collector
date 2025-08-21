@@ -13,8 +13,6 @@
 [![License](https://img.shields.io/badge/License-MIT-yellow.svg?style=for-the-badge)](LICENSE)
 [![Syslog](https://img.shields.io/badge/Syslog-RFC3164%20%26%20RFC5424-blue?style=for-the-badge)](https://tools.ietf.org/html/rfc5424)
 
-![SyslogPipe-Dockerized-S1-Collector.png](src/assets/images/SyslogPipe-Dockerized-S1-Collector.png)
-
 A production-ready Docker-based syslog collector that receives syslog messages and forwards them to SentinelOne SIEM in real-time using the [addEvents API](https://community.sentinelone.com/s/article/000006773).
 
 > [!IMPORTANT]

@@ -153,6 +153,52 @@ jobs:
         
         echo "✅ All configuration files present"
         
+    - name: Validate API token
+      run: |
+        echo "🔐 Validating SentinelOne SDL API token..."
+        
+        # Check if required environment variables are set
+        if [ -z "$AISIEM_LOGACCESS_WRITE_TOKEN" ]; then
+          echo "❌ AISIEM_LOGACCESS_WRITE_TOKEN is not set"
+          exit 1
+        fi
+        
+        if [ -z "$AISIEM_SERVER" ]; then
+          echo "❌ AISIEM_SERVER is not set"
+          exit 1
+        fi
+        
+        # Test API token with a lightweight request
+        echo "Testing API token with SentinelOne SDL..."
+        response=$(curl -s -w "%{http_code}" -o /dev/null \
+          -H "Authorization: Bearer $AISIEM_LOGACCESS_WRITE_TOKEN" \
+          -H "Content-Type: application/json" \
+          "https://$AISIEM_SERVER/api/v1/addEvents" \
+          -d '[]' \
+          --connect-timeout 10 \
+          --max-time 30)
+        
+        case "$response" in
+          "200"|"400")
+            echo "✅ API token validation successful (HTTP $response)"
+            ;;
+          "401"|"403")
+            echo "❌ FATAL ERROR: API token authentication failed (HTTP $response)"
+            echo "The provided API token is invalid or expired"
+            echo "Please check your AISIEM_LOGACCESS_WRITE_TOKEN secret"
+            exit 1
+            ;;
+          "000")
+            echo "⚠️  WARNING: Cannot connect to SentinelOne SDL server"
+            echo "This may be a network connectivity issue in GitHub Actions"
+            echo "Proceeding with tests, but SDL delivery may fail"
+            ;;
+          *)
+            echo "⚠️  WARNING: Unexpected response from SDL server (HTTP $response)"
+            echo "Proceeding with tests, but SDL delivery may fail"
+            ;;
+        esac
+        
     - name: Start syslog collector
       run: |
         echo "🚀 Starting syslog collector containers..."
@@ -232,6 +278,48 @@ jobs:
         
         # Run the test script
         ./utils/send.sh
+        
+    - name: Check for authentication errors
+      run: |
+        echo "🔍 Checking for authentication errors in scalyr-agent logs..."
+        
+        # Wait a moment for logs to be generated
+        sleep 5
+        
+        # Check for authentication errors in scalyr-agent logs
+        scalyr_logs=$(docker compose logs scalyr-agent --tail 100)
+        
+        # Check for authentication failures
+        if echo "$scalyr_logs" | grep -qi "401\|unauthorized\|authentication.*failed\|invalid.*token\|forbidden"; then
+          echo "❌ AUTHENTICATION ERROR DETECTED in scalyr-agent logs!"
+          echo "Authentication error details:"
+          echo "$scalyr_logs" | grep -i "401\|unauthorized\|authentication.*failed\|invalid.*token\|forbidden" | head -5
+          echo ""
+          echo "🔧 This indicates an API token issue. Please:"
+          echo "   1. Verify AISIEM_LOGACCESS_WRITE_TOKEN is correct"
+          echo "   2. Check if the token has expired"
+          echo "   3. Ensure the token has proper SDL permissions"
+          exit 1
+        fi
+        
+        # Check for successful requests
+        if echo "$scalyr_logs" | grep -q "agent_requests.*requests_sent"; then
+          echo "✅ Scalyr-agent is successfully sending requests to SDL"
+          echo "Recent request statistics:"
+          echo "$scalyr_logs" | grep "agent_requests" | tail -3
+        else
+          echo "⚠️  No request statistics found in logs yet"
+          echo "This may be normal if containers just started"
+        fi
+        
+        # Show any error patterns for debugging
+        error_count=$(echo "$scalyr_logs" | grep -c "ERROR\|WARN\|Failed" || true)
+        if [ "$error_count" -gt 0 ]; then
+          echo "⚠️  Found $error_count warning/error messages in scalyr-agent logs:"
+          echo "$scalyr_logs" | grep "ERROR\|WARN\|Failed" | tail -5
+        else
+          echo "✅ No errors found in scalyr-agent logs"
+        fi
         
         # Wait a moment for logs to be processed
         sleep 10

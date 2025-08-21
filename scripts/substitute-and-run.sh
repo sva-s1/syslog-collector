@@ -1,5 +1,60 @@
 #!/bin/sh
 
+# API Token validation function
+validate_api_token() {
+    local api_token="$1"
+    local server_url="$2"
+    
+    if [ -z "$api_token" ]; then
+        echo "❌ FATAL ERROR: API token is empty or not set!"
+        echo "   Please check AISIEM_LOGACCESS_WRITE_TOKEN environment variable"
+        exit 1
+    fi
+    
+    if [ -z "$server_url" ]; then
+        echo "❌ FATAL ERROR: Server URL is empty or not set!"
+        echo "   Please check AISIEM_SERVER environment variable"
+        exit 1
+    fi
+    
+    echo "🔐 Validating API token with SentinelOne SDL..."
+    
+    # Test API token by making a simple request to the server
+    # Use a lightweight endpoint to validate credentials
+    response=$(curl -s -w "%{http_code}" -o /dev/null \
+        -H "Authorization: Bearer $api_token" \
+        -H "Content-Type: application/json" \
+        "$server_url/api/v1/addEvents" \
+        -d '[]' \
+        --connect-timeout 10 \
+        --max-time 30)
+    
+    case "$response" in
+        "200"|"400") # 200=success, 400=bad request but auth OK
+            echo "✅ API token validation successful"
+            return 0
+            ;;
+        "401"|"403")
+            echo "❌ FATAL ERROR: API token authentication failed (HTTP $response)"
+            echo "   The provided API token is invalid or expired"
+            echo "   Please check your AISIEM_LOGACCESS_WRITE_TOKEN"
+            exit 1
+            ;;
+        "000")
+            echo "⚠️  WARNING: Cannot connect to SentinelOne SDL server"
+            echo "   Server: $server_url"
+            echo "   This may be a network connectivity issue"
+            echo "   Proceeding with startup, but SDL delivery may fail"
+            return 0
+            ;;
+        *)
+            echo "⚠️  WARNING: Unexpected response from SDL server (HTTP $response)"
+            echo "   Proceeding with startup, but SDL delivery may fail"
+            return 0
+            ;;
+    esac
+}
+
 # Cleanup function to remove sensitive files
 cleanup() {
     if [ -f "$SECURE_INPUT" ]; then
@@ -99,7 +154,7 @@ for var in $(printenv | grep '^SOURCE[0-9]*_NAME=' | sort -V); do
     # Add matchers section
     SOURCE_CONFIG="${SOURCE_CONFIG}     matchers:\n"
     SOURCE_CONFIG="${SOURCE_CONFIG}     - attribute: ${attribute_val}\n"
-    SOURCE_CONFIG="${SOURCE_CONFIG}       matcher: ${matcher_val}\n"
+    SOURCE_CONFIG="${SOURCE_CONFIG}       matcher: \"${matcher_val}\"\n"
     
     SOURCE_COUNT=$((SOURCE_COUNT + 1))
     
@@ -156,6 +211,21 @@ fi
 # Create cert directory and copy certificates
 mkdir -p /out/etc/syslog-ng/cert.d
 (cd /etc/syslog-collector && cp -f syslog.crt syslog.key /out/etc/syslog-ng/cert.d)
+
+# Validate API token before starting config-generator
+# Extract API token and server from the secure input file
+API_TOKEN=$(grep '^api-token:' "$SECURE_INPUT" | sed 's/^api-token: *//')
+DESTINATION=$(grep '^destination:' "$SECURE_INPUT" | sed 's/^destination: *//')
+
+# Convert destination to full URL if needed
+if echo "$DESTINATION" | grep -q '^https\?://'; then
+    SERVER_URL="$DESTINATION"
+else
+    SERVER_URL="https://$DESTINATION"
+fi
+
+# Validate the API token
+validate_api_token "$API_TOKEN" "$SERVER_URL"
 
 # Run the config-generator with all required parameters in background
 config-generator \

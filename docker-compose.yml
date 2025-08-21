@@ -2,7 +2,7 @@ services:
   config-generator:
     # For development use
     #build: ./config-generator
-    image: scalyr/syslog-collector-config-generator:1.1.4
+    image: scalyr/syslog-collector-config-generator:1.1.5
     env_file:
       - .env
     entrypoint: ["/substitute-and-run.sh"]

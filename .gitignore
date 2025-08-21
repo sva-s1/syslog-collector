@@ -11,6 +11,11 @@ cert.d/
 *.log
 !samples/*.log
 
+# Python virtual environment and testing
+testing/.venv/
+testing/__pycache__/
+testing/*.pyc
+
 # OS generated files
 .DS_Store
 .DS_Store?
@@ -25,3 +30,6 @@ Thumbs.db
 *.temp
 *~
 
+official-docs
+
+requirements.txt

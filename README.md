@@ -1,9 +1,9 @@
 <!-- shows only on the light theme -->
-<img src="assets/sentinelone-logo-light.svg#gh-light-mode-only"
-     alt="SentinelOne logo" height="95">
+<img src="src/assets/images/sentinelone-logo-light.svg#gh-light-mode-only"
+     alt="src/assets/images/SentinelOne logo" height="95">
 
 <!-- shows only on the dark theme -->
-<img src="assets/sentinelone-logo-dark.svg#gh-dark-mode-only"
+<img src="src/assets/images/sentinelone-logo-dark.svg#gh-dark-mode-only"
      alt="SentinelOne logo" height="95">
 
 # SentinelOne Syslog Collector

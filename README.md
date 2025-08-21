@@ -28,7 +28,7 @@ This is a fork of the [original SentinelOne Collector](https://community.sentine
 
 ### Choose Your Collector:
 
-- **Single syslog source or unique port per source?** → Use the [vanilla S1 Collector](https://community.sentinelone.com/s/topic/0TO69000000as2qGAA/sentinelone-collector) (no syslog-ng, straight Linux/Docker)
+- **Single syslog source or unique port per source?** → Use the [vanilla S1 Collector](https://github.com/sva-s1/s1-collector-syslog) (no syslog-ng, straight Linux/Docker)
 - **Multiple sources on same port with log differentiation?** → **Use this project!** 🚀
 - **Want to test addEvents API before installing anything?** → Try the [addEvents testing project](https://github.com/sva-s1/addEvents)
 - **Need raw log samples for testing and security research?** → Check out the [Log Zoo](https://github.com/sva-s1/log-zoo)!
